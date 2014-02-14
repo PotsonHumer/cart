@@ -977,7 +977,7 @@
 		function error_handle($switch=0){
 			global $tpl,$TPLMSG;
 			
-			switch($swthc){
+			switch($switch){
 				default:
 					$tpl->assignGlobal("MSG_CART_EMPTY",$TPLMSG['NO_DATA']);
 				break;
