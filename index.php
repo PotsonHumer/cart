@@ -7,7 +7,7 @@
 	class CART{
 		function __construct(){
 			global $cms_cfg,$tpl,$TPLMSG;
-			include_once("config.php");
+			include_once(dirname(__FILE__)."/config.php");
 			
 			$this->m_id = $_SESSION[$cms_cfg['sess_cookie_name']]["MEMBER_ID"];
 	        $this->ws_seo = ($cms_cfg["ws_module"]["ws_seo"])?1:0;
@@ -81,6 +81,8 @@
 			}else{
 				$tpl->assignInclude( "LEFT", '../'.$cms_cfg['base_left_member_tpl']); //左方首頁表單
 			}
+			$tpl->assignInclude( "TOP", $cms_cfg['base_top_tpl']); // 上方選單
+			$tpl->assignInclude( "FOOTER", $cms_cfg['base_footer_tpl']); // 版權宣告
 		    $tpl->assignInclude( "MAIN", $ws_tpl_file); //主功能顯示區
 		    $tpl->prepare();
 		    $tpl->assignGlobal( "TAG_CATE_TITLE", $ws_array["left"]["products"]);//左方menu title
@@ -93,6 +95,9 @@
 			
 			$tpl->newBlock("JS_MAIN");
 			$tpl->newBlock("JS_POP_IMG");
+			
+			// 共通使用程式
+			$main->share_function();
 		}
 		
 		## 主要功能 ######################################################################################
@@ -129,9 +134,10 @@
 		
 		// 清單顯示
 		function cart_list(){
-			global $cms_cfg,$tpl,$TPLMSG;
+			global $cms_cfg,$tpl,$TPLMSG,$ws_array;
 			
 			$tpl->assignGlobal(array(
+				"MSG_ID" => ($_SESSION[$cms_cfg['sess_cookie_name']]["sc_cart_type"])?$TPLMSG["ORDER_ID"]:$TPLMSG["INQUIRY_ID"],
 				"MSG_NAME"  => $TPLMSG['MEMBER_NAME'],
 				"MSG_CONTENT"  => $TPLMSG['CONTENT'],
 				"MSG_MODIFY" => $TPLMSG['MODIFY'],
@@ -190,6 +196,19 @@
 					
 	                $tpl->gotoBlock("SHOPPING_CART_ZONE");
 				}
+
+				if($_SESSION[$cms_cfg['sess_cookie_name']]["sc_cart_type"] && ($_REQUEST["func"] == "c_add" || empty($_REQUEST["func"]))){
+					// 顯示付款方式
+	                $tpl->newBlock("PAYMENT_TYPE");
+	                $tpl->assign("MSG_PAYMENT_TYPE" , $TPLMSG["PAYMENT_TYPE"]);
+	                foreach($ws_array["payment_type"] as $key => $payment){
+	                    $tpl->newBlock("PAYMENT_TYPE_ITEMS");
+	                    $tpl->assign(array(
+	                    	"VALUE_PAYMENT_TYPE" => $payment,
+	                    	"VALUE_PAYMENT_CURRENT" => ($payment == $_SESSION[$cms_cfg['sess_cookie_name']]["o_payment_type"])?'checked':'',
+	                    ));
+	                }
+				}
 			}else{
 				$this->error_handle();
 			}
@@ -224,12 +243,17 @@
 				
 				if($_SESSION[$cms_cfg['sess_cookie_name']]["sc_cart_type"]){
 					// 顯示付款方式
+					
+					// 檢查是否選擇付款方式
+					if(empty($_SESSION[$cms_cfg['sess_cookie_name']]["o_payment_type"])){
+						$tpl->assignGlobal("MSG_PAYMENT_ALERT",'alert("'.$TPLMSG['NO_PAYMENT'].'"); location.href = "'.$cms_cfg["base_root"].'cart/"');
+					}
+					
 	                $tpl->newBlock("PAYMENT_TYPE");
-	                $tpl->assign("MSG_PAYMENT_TYPE" , $TPLMSG["PAYMENT_TYPE"]);
-	                for($i=0;$i<count($ws_array["payment_type"]);$i++){
-	                    $tpl->newBlock("PAYMENT_TYPE_ITEMS");
-	                    $tpl->assign("VALUE_PAYMENT_TYPE" , $ws_array["payment_type"][$i]);
-	                }
+	                $tpl->assign(array(
+	                	"MSG_PAYMENT_TYPE" => $TPLMSG["PAYMENT_TYPE"],
+	                	"VALUE_PAYMENT_TYPE" => $_SESSION[$cms_cfg['sess_cookie_name']]["o_payment_type"],
+					));
 					
 					// 購物收件人表單
 					$tpl->newBlock("TAG_ADDRESSEE_BLOCK");
@@ -255,7 +279,7 @@
 		
 		// 送出訂單
 		function cart_replace(){
-			global $db,$tpl,$cms_cfg,$TPLMSG,$main;
+			global $db,$tpl,$cms_cfg,$TPLMSG,$main,$allpay;
 			
 			$this->o_id = $this->o_id_generator();
 			
@@ -280,9 +304,11 @@
 	        $tpl->newBlock("MEMBER_DATA_FORM");
 	        $tpl->assign($this->basic_lang);
 			$tpl->assign(array(
+				"VALUE_O_ID" => $this->o_id,
 				"VALUE_M_COMPANY_NAME" => $_REQUEST["m_company_name"],
-				"VALUE_M_CONTACT_S" => $this->gender_list($_REQUEST["m_contact_s"],1),
-				"VALUE_M_NAME" => $_REQUEST["m_name"],
+				//"VALUE_M_CONTACT_S" => $this->gender_list($_REQUEST["m_contact_s"],1),
+				//"VALUE_M_NAME" => $_REQUEST["m_name"],
+				"VALUE_M_NAME" => (empty($this->gender_select))?$this->gender_list($_REQUEST["m_contact_s"],1).'&nbsp;'.$_REQUEST["m_name"]:$_REQUEST["m_name"].'&nbsp;'.$this->gender_list($_REQUEST["m_contact_s"],1),
 				"VALUE_M_ZIP" => $_REQUEST["m_zip"],
 				"VALUE_M_ADDRESS" => $_REQUEST["m_address"],
 				"VALUE_M_TEL" => $_REQUEST["m_tel"],
@@ -296,6 +322,14 @@
 			$this->new_member();
 			
 			if($_SESSION[$cms_cfg['sess_cookie_name']]["sc_cart_type"]){
+				// 顯示付款方式
+                $tpl->newBlock("PAYMENT_TYPE");
+                $tpl->assign(array(
+                	"MSG_PAYMENT_TYPE" => $TPLMSG["PAYMENT_TYPE"],
+                	"VALUE_PAYMENT_TYPE" => $_SESSION[$cms_cfg['sess_cookie_name']]["o_payment_type"],
+				));
+
+				// 收件人資訊
 				$tpl->newBlock("TAG_ADDRESSEE_BLOCK");
 				$tpl->assign($this->adv_lang);
 				$tpl->assign(array(
@@ -376,7 +410,7 @@
                     '".$this->subtotal_money."',
                     '".$this->total_money."',
                     '".$_REQUEST["content"]."',
-                    '".$_REQUEST["o_payment_type"]."',
+                    '".$_SESSION[$cms_cfg['sess_cookie_name']]["o_payment_type"]."',
                     '".$_REQUEST["o_add_name"]."',
 					'".$_REQUEST["o_add_tel"]."',
 					'".$_REQUEST["o_add_address"]."',
@@ -400,6 +434,8 @@
 					$special_price = $this->price_counter($row,1);
 				}
 				
+				$row["p_price"] = $special_price;
+				
                 $sql="
                     insert into ".$cms_cfg['tb_prefix']."_order_items (
                         m_id,
@@ -417,15 +453,39 @@
                         '".$row["p_num"]."'
                     )";
                 $rs = $db->query($sql);
+                
+				$all_row[$sess] = $row;
             }
 			
-			// Mail
-			$this->mail_handle();
+			// ALLPAY (歐付寶)
+			if($allpay->allpay_switch && $_SESSION[$cms_cfg['sess_cookie_name']]["sc_cart_type"]){
+				foreach($allpay->all_cfg["allpay_type"] as $type => $str){
+					if($_SESSION[$cms_cfg['sess_cookie_name']]["o_payment_type"] == $str && !empty($_SESSION[$cms_cfg['sess_cookie_name']]["o_payment_type"])){
+						$allpay_payment = $type;
+					}
+				}
+				
+				if(!empty($allpay_payment)){
+					$allpay->allpay_send(
+						$this->o_id, // 訂單編號
+						$this->total_money, // 交易總金額
+						0, // 交易描述 (不可空值)
+						$all_row, // 商品資訊 (array)
+						$allpay_payment, // 交易方式
+						0 // 選擇預設付款子項目
+					);
+					
+					$mail_goto = 1;
+				}
+			}
+			
+			$this->mail_handle($mail_goto);
 			
 	        $db_msg = $db->report();
 	        if($db_msg == ""){
 	            unset($_SESSION[$cms_cfg['sess_cookie_name']]["id"]);
 	            unset($_SESSION[$cms_cfg['sess_cookie_name']]["num"]);
+				unset($_SESSION[$cms_cfg['sess_cookie_name']]["o_payment_type"]);
 	        }else{
 	            $tpl->assignGlobal( "MSG_ACTION_TERM" , "DB Error: $db_msg, please contact MIS");
 	        }
@@ -443,6 +503,8 @@
 					
 					$_SESSION[$cms_cfg['sess_cookie_name']]["num"][$sess_array[1]] = $num;
 				}
+
+				$_SESSION[$cms_cfg['sess_cookie_name']]["o_payment_type"] = $form["o_payment_type"];
 			}else{
 				$this->error_handle();
 			}
@@ -467,7 +529,7 @@
 		function cart_order(){
 			global $db,$tpl,$cms_cfg,$TPLMSG,$ws_array,$main;
 			
-			$sql="select * from ".$cms_cfg['tb_prefix']."_order where m_id='".$this->m_id."'";
+			$sql="select * from ".$cms_cfg['tb_prefix']."_order where m_id='".$this->m_id."' order by o_createdate desc";
             //取得總筆數
             $selectrs = $db->query($sql);
             $total_records    = $db->numRows($selectrs);
@@ -652,7 +714,7 @@
 		
 		// 產品價格處理
 		function price_counter($row=0,$switch=0){
-			global $cms_cfg,$tpl,$TPLMSG;
+			global $cms_cfg,$tpl,$TPLMSG,$allpay;
 			
 			$p_price = (!empty($row["p_special_price"]))?$row["p_special_price"]:$row["p_list_price"];
 			
@@ -693,8 +755,13 @@
 			$this->price_count++;
 			if(count($_SESSION[$cms_cfg['sess_cookie_name']]["id"]) == $this->price_count && empty($switch)){
 				
+				// 手續費
+				if($allpay->allpay_switch && ($_SESSION[$cms_cfg['sess_cookie_name']]["o_payment_type"] == $allpay->all_cfg["allpay_type"]["CVS"] || $_SESSION[$cms_cfg['sess_cookie_name']]["o_payment_type"] == $allpay->all_cfg["allpay_type"]["BARCODE"])){
+					$plus_fee = 30;
+				}
+
 				// 總價
-				$this->total_money = $this->subtotal_money + $this->shipping_price;
+				$this->total_money = $this->subtotal_money + $this->shipping_price + $plus_fee;
 				
 				// 顯示價格抬頭
 				$tpl->newBlock("TAG_PRICE_TH");
@@ -702,6 +769,15 @@
 	            	"MSG_PRODUCT_SPECIAL_PRICE" => $msg_price,
 	            	"VALUE_P_DISCOUNT" => $msg_discount,
 				));
+				
+				// 顯示手續費
+				if(!empty($plus_fee)){
+					$tpl->newBlock("TAG_PLUS_FEE");
+		            $tpl->assign(array(
+		            	"MSG_PLUS_FEE" => $TPLMSG["PLUS_FEE"],
+		            	"VALUE_PLUS_FEE" => $plus_fee,
+					));
+				}
 				
 				// 顯示總價
 				$tpl->newBlock("TAG_PRICE_TOTAL");
@@ -930,7 +1006,7 @@
 		}
 		
 		// 寄送訊息
-		function mail_handle(){
+		function mail_handle($none_goto=0){
             global $db,$cms_cfg,$tpl,$main,$TPLMSG;
 			
             if($_SESSION[$cms_cfg['sess_cookie_name']]["sc_cart_type"]){
@@ -952,9 +1028,9 @@
             if($cms_cfg["ws_module"]["ws_cart_login"]==0){
                 $goto_url = $_SESSION[$cms_cfg['sess_cookie_name']]['CONTINUE_SHOPPING_URL'];
             }else{
-                $goto_url = (!empty($this->mail_goto_url))?$this->mail_goto_url:$cms_cfg["base_url"]."cart/?func=c_order";
+                $goto_url = (!empty($this->mail_goto_url))?$this->mail_goto_url:$cms_cfg["base_url"]."cart/?func=c_order_detial&o_id=".$this->o_id;
             }
-            $main->ws_mail_send($_SESSION[$cms_cfg['sess_cookie_name']]['sc_email'],$_REQUEST["m_email"],$mail_content,$mail_title,$mail_func,$goto_url);
+            $main->ws_mail_send($_SESSION[$cms_cfg['sess_cookie_name']]['sc_email'],$_REQUEST["m_email"],$mail_content,$mail_title,$mail_func,$goto_url,$none_goto);
 		}
 		
 		// 讀取各式服務條款

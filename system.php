@@ -19,5 +19,6 @@
 	$main = new MAINFUNC;
 	include_once("../TP/class.TemplatePower.inc.php");
 	include_once("../lang/".$cms_cfg['language']."-utf8.php");
+	//include_once("../allpay/index.php"); // 載入歐付寶
 	include_once("../conf/default-items.php");
 ?>

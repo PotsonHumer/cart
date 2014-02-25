@@ -70,19 +70,25 @@
                 <!-- END BLOCK : TAG_PRICE_TD -->
             </tr>
             <!-- END BLOCK : TAG_CART_LIST -->
+            <!-- START BLOCK : TAG_PLUS_FEE -->
+			<tr>
+			    <td colspan="4">
+			        <div align="right"> {MSG_PLUS_FEE}:&nbsp;</div>
+			    </td>
+			    <td colspan="3"> {VALUE_PLUS_FEE}</td>
+			</tr>
+			<!-- END BLOCK : TAG_PLUS_FEE -->
             <!-- START BLOCK : TAG_PRICE_TOTAL -->
             <tr>
                 <td colspan="4">
-                    <div align="right">{MSG_SHIPPING_PRICE}:&nbsp;</div>
+                    <div align="right"> {MSG_SHIPPING_PRICE}:&nbsp;</div>
                 </td>
-                <td colspan="2"> {VALUE_SHIPPING_PRICE}</td>
-            </tr>
+                <td colspan="2"> {VALUE_SHIPPING_PRICE}</td></tr>
             <tr>
                 <th colspan="4">
                     <div align="right"> {MSG_TOTAL}:&nbsp;</div>
                 </th>
-                <th colspan="2"> {VALUE_TOTAL}
-                </th>
+                <th colspan="2"> {VALUE_TOTAL}</th>
             </tr>
             <!-- END BLOCK : TAG_PRICE_TOTAL -->
         </table>
@@ -93,15 +99,8 @@
         <table width="90%" border="0" align="center" cellpadding="0" cellspacing="0" class="member_table altrow_table">
             <!-- START BLOCK : PAYMENT_TYPE -->
             <tr>
-                <th>
-                    {MSG_PAYMENT_TYPE}</th>
-                <td>
-                    <select name="o_payment_type">
-                    <!-- START BLOCK : PAYMENT_TYPE_ITEMS -->
-                        <option value="{VALUE_PAYMENT_TYPE}">{VALUE_PAYMENT_TYPE}</option>
-                    <!-- END BLOCK : PAYMENT_TYPE_ITEMS -->
-                    </select>
-                    </td>
+                <th>{MSG_PAYMENT_TYPE}</th>
+                <td>{VALUE_PAYMENT_TYPE}</td>
             </tr>
             <!-- END BLOCK : PAYMENT_TYPE -->
             <tr>
@@ -219,6 +218,8 @@
 					{MSG_YEAR_WORD} : <select class="date_picker" name="o_arrival_time[]" rel="y"></select>&nbsp;&nbsp;
 					{MSG_MONTH_WORD} : <select class="date_picker" name="o_arrival_time[]" rel="m"></select>&nbsp;&nbsp;
 					{MSG_DAY_WORD} : <select class="date_picker" name="o_arrival_time[]" rel="d"></select>&nbsp;&nbsp;
+					
+					<span id="date_week"></span>
             	</td>
             </tr>
             <tr>
@@ -290,6 +291,43 @@
     <script src="{TAG_ROOT_PATH}js/date_box.js" type="text/javascript"></script>
     <script src="{TAG_ROOT_PATH}js/zone_box.js" type="text/javascript"></script>
 	<script>
+		function week_get(){
+			var DATE_GET = new Array();
+			$(".date_picker").each(function(KEY){
+				DATE_GET[KEY] = $(this).val();
+			});
+			
+			var DATE_STR = DATE_GET[0] +'-'+ DATE_GET[1] +'-'+ DATE_GET[2];
+			var THY_DAY = new Date(DATE_STR);
+			var THY_WEEK = THY_DAY.getDay();
+			
+			switch(THY_WEEK){
+				default:
+					var WEEK_STR = '日';
+				break;
+				case 1:
+					var WEEK_STR = '一';
+				break;
+				case 2:
+					var WEEK_STR = '二';
+				break;
+				case 3:
+					var WEEK_STR = '三';
+				break;
+				case 4:
+					var WEEK_STR = '四';
+				break;
+				case 5:
+					var WEEK_STR = '五';
+				break;
+				case 6:
+					var WEEK_STR = '六';
+				break;
+			}
+			
+			$("#date_week").html('星期'+ WEEK_STR);
+		}
+		
 		$(function(){
 			$(".altrow_table tr").each(function(KEY){
 				if(KEY % 2 == 0){
@@ -351,6 +389,11 @@
 				RANGE : "{VALUE_ARRIVAL_RANGE}", // 限制範圍,指定時間往後計算天數
 			});
 			
+			week_get();
+			$(".date_picker").change(function(){
+				week_get();
+			});
+			
 			//----
 			$(document).zone_box({
 				MAIN_ID : "zone_main", // 縣市元素 ID (select 元素)
@@ -360,5 +403,7 @@
 			},function(ZIP){
 				//callback
 			});
+			
+			{MSG_PAYMENT_ALERT}
 		});
 	</script>
